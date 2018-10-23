@@ -2,47 +2,47 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
-
+ 
 public class MyHttpProxy extends Thread {
-    public static int CONNECT_RETRIES = 5; // ³¢ÊÔÓëÄ¿±êÖ÷»úÁ¬½Ó´ÎÊı
-    public static int CONNECT_PAUSE = 5; // Ã¿´Î½¨Á¢Á¬½ÓµÄ¼ä¸ôÊ±¼ä
-    public static int TIMEOUT = 8000; // Ã¿´Î³¢ÊÔÁ¬½ÓµÄ×î´óÊ±¼ä
-    public static int BUFSIZ = 1024; // »º³åÇø×î´ó×Ö½ÚÊı
-    public static boolean logging = false; // ÊÇ·ñ¼ÇÂ¼ÈÕÖ¾
-    public static OutputStream log_S = null; // ÈÕÖ¾Êä³öÁ÷
-    public static OutputStream log_C = null; // ÈÕÖ¾Êä³öÁ÷
-    public static OutputStream log_D = null; // ÏìÓ¦±¨ÎÄÈÕÖ¾
+    public static int CONNECT_RETRIES = 5; // å°è¯•ä¸ç›®æ ‡ä¸»æœºè¿æ¥æ¬¡æ•°
+    public static int CONNECT_PAUSE = 5; // æ¯æ¬¡å»ºç«‹è¿æ¥çš„é—´éš”æ—¶é—´
+    public static int TIMEOUT = 8000; // æ¯æ¬¡å°è¯•è¿æ¥çš„æœ€å¤§æ—¶é—´
+    public static int BUFSIZ = 1024; // ç¼“å†²åŒºæœ€å¤§å­—èŠ‚æ•°
+    public static boolean logging = false; // æ˜¯å¦è®°å½•æ—¥å¿—
+    public static OutputStream log_S = null; // æ—¥å¿—è¾“å‡ºæµ
+    public static OutputStream log_C = null; // æ—¥å¿—è¾“å‡ºæµ
+    public static OutputStream log_D = null; // å“åº”æŠ¥æ–‡æ—¥å¿—
     public static int count = -1;
     public static List<String> requestInfo = new ArrayList<String>();
     public static List<String> cacheInfo;
     Socket ssocket = null;
-    // cisÎª¿Í»§¶ËÊäÈëÁ÷£¬sisÎªÄ¿±êÖ÷»úÊäÈëÁ÷
+    // cisä¸ºå®¢æˆ·ç«¯è¾“å…¥æµï¼Œsisä¸ºç›®æ ‡ä¸»æœºè¾“å…¥æµ
     InputStream cis = null, sis = null;
-    BufferedReader cbr = null, sbr = null; // ×ª»¯Îª×Ö·ûÁ÷¶ÁÈ¡±ãÓÚ±È½Ï
-    // cosÎª¿Í»§¶ËÊä³öÁ÷£¬sosÎªÄ¿±êÖ÷»úÊä³öÁ÷
+    BufferedReader cbr = null, sbr = null; // è½¬åŒ–ä¸ºå­—ç¬¦æµè¯»å–ä¾¿äºæ¯”è¾ƒ
+    // cosä¸ºå®¢æˆ·ç«¯è¾“å‡ºæµï¼Œsosä¸ºç›®æ ‡ä¸»æœºè¾“å‡ºæµ
     OutputStream cos = null, sos = null;
-    PrintWriter cpw = null, spw = null;// ×ª»¯Îª×Ö·ûÁ÷
-    String buffer = ""; // ¶ÁÈ¡ÇëÇóÍ·
-    String URL = ""; // ¶ÁÈ¡ÇëÇóURL
-    String host = ""; // ¶ÁÈ¡Ä¿±êÖ÷»úhost
-    int port = 80; // Ä¬ÈÏ¶Ë¿Ú80
-    String findUrl = "";// ÔÚ»º´æÖĞ²éÕÒµÄurl
-    // Óë¿Í»§¶ËÏàÁ¬µÄSocket
+    PrintWriter cpw = null, spw = null;// è½¬åŒ–ä¸ºå­—ç¬¦æµ
+    String buffer = ""; // è¯»å–è¯·æ±‚å¤´
+    String URL = ""; // è¯»å–è¯·æ±‚URL
+    String host = ""; // è¯»å–ç›®æ ‡ä¸»æœºhost
+    int port = 80; // é»˜è®¤ç«¯å£80
+    String findUrl = "";//åœ¨ç¼“å­˜ä¸­æŸ¥æ‰¾çš„url
+    // ä¸å®¢æˆ·ç«¯ç›¸è¿çš„Socket
     protected Socket csocket;
-
+ 
     public MyHttpProxy(Socket cs) {
         try {
             csocket = cs;
-            cis = csocket.getInputStream(); // ´úÀí·şÎñÆ÷×÷Îª·şÎñÆ÷½ÓÊÜ¿Í»§¶ËµÄÇëÇó
+            cis = csocket.getInputStream(); // ä»£ç†æœåŠ¡å™¨ä½œä¸ºæœåŠ¡å™¨æ¥å—å®¢æˆ·ç«¯çš„è¯·æ±‚
             cbr = new BufferedReader(new InputStreamReader(cis));
-            cos = csocket.getOutputStream(); // ´úÀí·şÎñÆ÷×÷Îª·şÎñÆ÷Ïò¿Í»§¶Ë·¢³öÏìÓ¦
+            cos = csocket.getOutputStream(); // ä»£ç†æœåŠ¡å™¨ä½œä¸ºæœåŠ¡å™¨å‘å®¢æˆ·ç«¯å‘å‡ºå“åº”
             cpw = new PrintWriter(cos);
             start();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
+ 
     public void writeLog(int c, int browser) throws IOException {
         if (browser == 1)
             log_C.write((char) c);
@@ -51,174 +51,175 @@ public class MyHttpProxy extends Thread {
         else
             log_D.write((char) c);
     }
-
-    public void writeLog(byte[] bytes, int offset, int len, int browser) throws IOException {
+ 
+    public void writeLog(byte[] bytes, int offset, int len, int browser)
+            throws IOException {
         for (int i = 0; i < len; i++)
             writeLog((int) bytes[offset + i], browser);
     }
-
-    public void run() {
-        try {
-            csocket.setSoTimeout(TIMEOUT);
-            System.out.println("µ½ÁË¶ÁÈ¡µÚÒ»ĞĞ");
-            buffer = cbr.readLine(); // »ñÈ¡Ê×²¿ĞĞ
-            System.out.println("buffer:" + buffer);
-
-            URL = getRequestURL(buffer);
-            System.out.println(URL);
-            if (URL.equals("http://www.sogou.com/")) {
-                URL = "http://www.taobao.com/";
-                buffer = "GET " + URL + " HTTP/1.1";
-                requestInfo.add("Accept: text/html, application/xhtml+xml, */*");
-                requestInfo.add("Accept-Language: zh-Hans-CN,zh-Hans;q=0.8,en-US;q=0.5,en;q=0.3");
-                requestInfo.add(
-                        "User-Agent: Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.2; WOW64; Trident/6.0)");
-                requestInfo.add("Accept-Encoding: gzip, deflate");
-                requestInfo.add("Proxy-Connection: Keep-Alive");
-                requestInfo.add("DNT: 1");
-                requestInfo.add("Host: www.taobao.com");
-                requestInfo.add(
-                        "Cookie: thw=cn; isg=0BC4B5EFD7C7FCFEB73317770EA7F3F5; l=AeVoHE44ZTsle7DjpW8fBSV7pbSl-2U7; cna=GCHeDZQAVwkCAdvZ9Apwg8rH; t=1a1386bec550ab78d1aaf5ad5b90e044; mt=ci%3D-1_0; _med=dw:1366&dh:768&pw:1366&ph:768&ist:0");
-            } else if (URL.equals("http://www.qq.com/")) {
-                URL = "";
-            }
-            int n;
-            // ³éÈ¡host
-            n = URL.indexOf("//");
-            if (n != -1)
-                host = URL.substring(n + 2); // www.baidu.com/
-            n = host.indexOf('/');
-            if (n != -1)
-                host = host.substring(0, n);// www.baidu.com
-            n = URL.indexOf('?');
-            if (n != -1)
-                findUrl = URL.substring(0, n);
-            else
-                findUrl = URL;
-
-            // ·ÖÎö¿ÉÄÜ´æÔÚµÄ¶Ë¿ÚºÅ
-            n = host.indexOf(':');
-            if (n != -1) {
-                port = Integer.parseInt(host.substring(n + 1));
-                host = host.substring(0, n);
-            }
-            int retry = CONNECT_RETRIES;
-            while (retry-- != 0 && !host.equals("")) {
-                try {
-                    System.out.println("¶Ë¿ÚºÅ£º" + port + "Ö÷»ú£º" + host);
-                    System.out.println("µÚÒ»ĞĞÊÇ " + retry + ":" + buffer);
-                    ssocket = new Socket(host, port); // ³¢ÊÔ½¨Á¢ÓëÄ¿±êÖ÷»úµÄÁ¬½Ó
-                    break;
-                } catch (Exception e) {
-                    e.printStackTrace();
+ 
+    public void run() {  
+            try { 
+                csocket.setSoTimeout(TIMEOUT);
+                System.out.println("åˆ°äº†è¯»å–ç¬¬ä¸€è¡Œ");
+                buffer = cbr.readLine(); // è·å–é¦–éƒ¨è¡Œ
+                System.out.println("buffer:" + buffer);
+ 
+                URL = getRequestURL(buffer);
+                System.out.println(URL);
+                if(URL.equals("http://www.sogou.com/")){
+                    URL = "http://www.taobao.com/";
+                    buffer = "GET "+URL+" HTTP/1.1"; 
+                    requestInfo.add("Accept: text/html, application/xhtml+xml, */*"); 
+                    requestInfo.add("Accept-Language: zh-Hans-CN,zh-Hans;q=0.8,en-US;q=0.5,en;q=0.3"); 
+                    requestInfo.add("User-Agent: Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.2; WOW64; Trident/6.0)");
+                    requestInfo.add("Accept-Encoding: gzip, deflate");
+                    requestInfo.add("Proxy-Connection: Keep-Alive");
+                    requestInfo.add("DNT: 1");
+                    requestInfo.add("Host: www.taobao.com");
+                    requestInfo.add("Cookie: thw=cn; isg=0BC4B5EFD7C7FCFEB73317770EA7F3F5; l=AeVoHE44ZTsle7DjpW8fBSV7pbSl-2U7; cna=GCHeDZQAVwkCAdvZ9Apwg8rH; t=1a1386bec550ab78d1aaf5ad5b90e044; mt=ci%3D-1_0; _med=dw:1366&dh:768&pw:1366&ph:768&ist:0");
                 }
-                // µÈ´ı
-                Thread.sleep(CONNECT_PAUSE);
-            }
-            if (ssocket != null) {
-                ssocket.setSoTimeout(TIMEOUT);
-                sis = ssocket.getInputStream(); // ´úÀí·şÎñÆ÷×÷Îª¿Í»§¶Ë½ÓÊÜÏìÓ¦
-                sbr = new BufferedReader(new InputStreamReader(sis));
-                sos = ssocket.getOutputStream(); // ´úÀí·şÎñÆ÷×÷Îª¿Í»§¶Ë·¢³öÇëÇó
-                spw = new PrintWriter(sos);
-
-                String modifTime = findCache(findUrl);// ÔÚ»º´æÖĞÑ°ÕÒÊÇ·ñÖ®Ç°ÒÑ¾­»º´æ¹ıÕâ¸öurlµÄĞÅÏ¢
-                System.out.println("ÉÏÒ»´ÎĞŞ¸ÄµÄÊ±¼äÎª£º" + modifTime);//
-                writeLog(buffer.getBytes(), 0, buffer.length(), 1);
-                writeLog(buffer.getBytes(), 0, buffer.length(), 3);
-                writeLog("\r\n".getBytes(), 0, 2, 3);
-                // Ö®Ç°Ã»ÓĞ»º´æ
-                if (modifTime == null) {
-                    while (!buffer.equals("")) {
-                        buffer += "\r\n";
-                        if (buffer.contains("www.taobao.com")) { // ÆÁ±ÎÈËÈËÍø£¬Èç¹ûÊÇÌÔ±¦¾Í·¢ËÍÌÔ±¦µÄ±¨ÎÄ
-                            int k = 0;
-                            while (requestInfo.size() - k > 0) {
-                                spw.write(buffer);
-                                buffer = requestInfo.get(k++);
-                                buffer += "\r\n";
-                            }
-                            break;
-                        } else {
-                            spw.write(buffer);
-                            writeLog(buffer.getBytes(), 0, buffer.length(), 1);
-                            System.out.print("Ïò·şÎñÆ÷·¢ËÍÇëÇó£º" + buffer);
-                            buffer = cbr.readLine();
-                        }
+                else if(URL.equals("http://www.qq.com/")) {
+                    URL = "";
+                }
+                int n;
+                // æŠ½å–host
+                n = URL.indexOf("//");
+                if (n != -1)
+                    host = URL.substring(n + 2); // www.baidu.com/
+                n = host.indexOf('/');
+                if (n != -1)
+                    host = host.substring(0, n);// www.baidu.com
+                n = URL.indexOf('?');
+                if(n != -1)
+                    findUrl = URL.substring(0,n);
+                else findUrl = URL;
+ 
+                // åˆ†æå¯èƒ½å­˜åœ¨çš„ç«¯å£å·
+                n = host.indexOf(':');
+                if (n != -1) {
+                    port = Integer.parseInt(host.substring(n + 1));
+                    host = host.substring(0, n);
+                }
+                int retry = CONNECT_RETRIES;
+                while (retry-- != 0 && !host.equals("")) {
+                    try {
+                        System.out.println("ç«¯å£å·ï¼š" + port + "ä¸»æœºï¼š" + host);
+                        System.out.println("ç¬¬ä¸€è¡Œæ˜¯ " + retry + ":" + buffer);
+                        ssocket = new Socket(host, port); // å°è¯•å»ºç«‹ä¸ç›®æ ‡ä¸»æœºçš„è¿æ¥
+                        break;
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                    spw.write("\r\n");
-                    writeLog("\r\n".getBytes(), 0, 2, 1);
-                    spw.flush();
-                    // ¶ÁÈ¡·şÎñÆ÷µÄÏìÓ¦ĞÅÏ¢
-                    int length;
-                    byte bytes[] = new byte[BUFSIZ];
-                    while (true) {
-                        try {
-                            if ((length = sis.read(bytes)) > 0) { // ¶ÁÈ¡¿Í»§¶ËµÄÇëÇó×ª¸ø·şÎñÆ÷
-                                cos.write(bytes, 0, length);
-                                if (logging) {
-                                    writeLog(bytes, 0, length, 1);
-                                    writeLog(bytes, 0, length, 3);
-                                }
-                            } else if (length < 0)
-                                break;
-                        } catch (SocketTimeoutException e) {
-                        } catch (InterruptedIOException e) {
-                            System.out.println("\nRequest Exception:");
-                            e.printStackTrace();
-                        }
-                    }
-                    if (count == 0) {
-                        System.out.println(cbr.readLine());
-                    }
-                    cpw.write("\r\n");
+                    // ç­‰å¾…
+                    Thread.sleep(CONNECT_PAUSE);
+                }
+                if (ssocket != null) {
+                    ssocket.setSoTimeout(TIMEOUT);
+                    sis = ssocket.getInputStream(); // ä»£ç†æœåŠ¡å™¨ä½œä¸ºå®¢æˆ·ç«¯æ¥å—å“åº”
+                    sbr = new BufferedReader(new InputStreamReader(sis));
+                    sos = ssocket.getOutputStream(); // ä»£ç†æœåŠ¡å™¨ä½œä¸ºå®¢æˆ·ç«¯å‘å‡ºè¯·æ±‚
+                    spw = new PrintWriter(sos);
+                    
+                    String modifTime = findCache(findUrl);// åœ¨ç¼“å­˜ä¸­å¯»æ‰¾æ˜¯å¦ä¹‹å‰å·²ç»ç¼“å­˜è¿‡è¿™ä¸ªurlçš„ä¿¡æ¯
+                    System.out.println("ä¸Šä¸€æ¬¡ä¿®æ”¹çš„æ—¶é—´ä¸ºï¼š" + modifTime);//
+                    writeLog(buffer.getBytes(), 0, buffer.length(), 1);
+                    writeLog(buffer.getBytes(), 0, buffer.length(), 3);
                     writeLog("\r\n".getBytes(), 0, 2, 3);
-                    writeLog("\r\n".getBytes(), 0, 2, 2);
-                    cpw.flush();
-                } else {
-                    buffer += "\r\n";
-                    spw.write(buffer);
-                    System.out.print("Ïò·şÎñÆ÷·¢ËÍÈ·ÈÏĞŞ¸ÄÊ±¼äÇëÇó:" + buffer);
-                    String str1 = "Host: " + host + "\r\n";
-                    spw.write(str1);
-                    String str = "If-modified-since: " + modifTime + "\r\n";
-                    spw.write(str);
-                    spw.write("\r\n");
-                    spw.flush();
-                    System.out.print(str1);
-                    System.out.print(str);
-
-                    String info = sbr.readLine();
-                    System.out.println("·şÎñÆ÷·¢»ØµÄĞÅÏ¢ÊÇ£º" + info);
-                    if (info.contains("Not Modified")) {
-                        int j = 0;
-                        System.out.println("Ê¹ÓÃ»º´æÖĞµÄÊı¾İ");
-                        while (j < cacheInfo.size()) {
-                            info = cacheInfo.get(j++);
-                            info += "\r\n";
-                            System.out.print(info);
-                            cpw.write(info);
+                    // ä¹‹å‰æ²¡æœ‰ç¼“å­˜
+                    if (modifTime == null) {
+                        while (!buffer.equals("")) {
+                            buffer += "\r\n"; 
+                            if(buffer.contains("www.taobao.com")) { //å±è”½äººäººç½‘ï¼Œå¦‚æœæ˜¯æ·˜å®å°±å‘é€æ·˜å®çš„æŠ¥æ–‡
+                                int k = 0;
+                                while(requestInfo.size() - k > 0) {
+                                    spw.write(buffer);
+                                    buffer = requestInfo.get(k++);
+                                    buffer += "\r\n";
+                                }
+                                break;
+                            }
+                            else{ 
+                                spw.write(buffer); 
+                            writeLog(buffer.getBytes(), 0, buffer.length(), 1);
+                            System.out.print("å‘æœåŠ¡å™¨å‘é€è¯·æ±‚ï¼š"+buffer);
+                            buffer = cbr.readLine();
+                            }
+                        }
+                        spw.write("\r\n");
+                        writeLog("\r\n".getBytes(), 0, 2, 1);
+                        spw.flush();
+                        // è¯»å–æœåŠ¡å™¨çš„å“åº”ä¿¡æ¯
+                        int length;
+                        byte bytes[] = new byte[BUFSIZ];
+                        while (true) {
+                            try {
+                                if ((length = sis.read(bytes)) > 0) { // è¯»å–å®¢æˆ·ç«¯çš„è¯·æ±‚è½¬ç»™æœåŠ¡å™¨
+                                    cos.write(bytes, 0, length);
+                                    if (logging) {
+                                        writeLog(bytes, 0, length, 1);
+                                        writeLog(bytes,0,length,3);
+                                    }
+                                } else if (length < 0)
+                                    break;
+                            } catch (SocketTimeoutException e) {
+                            } catch (InterruptedIOException e) {
+                                System.out.println("\nRequest Exception:");
+                                e.printStackTrace();
+                            }
+                        } 
+                        if(count == 0) {
+                            System.out.println(cbr.readLine());
                         }
                         cpw.write("\r\n");
+                        writeLog("\r\n".getBytes(), 0, 2, 3);
+                        writeLog("\r\n".getBytes(), 0, 2, 2);
                         cpw.flush();
                     } else {
-                        System.out.println("ÓĞ¸üĞÂ£¬Ê¹ÓÃĞÂµÄÊı¾İ");
-                        while (!info.equals("")) {
-                            info += "\r\n";
-                            System.out.print("ĞÂµÄÊı¾İÊÇ£º" + info);
-                            cpw.write(info);
-                            info = sbr.readLine();
+                        buffer += "\r\n";
+                        spw.write(buffer);
+                        System.out.print("å‘æœåŠ¡å™¨å‘é€ç¡®è®¤ä¿®æ”¹æ—¶é—´è¯·æ±‚:"+buffer);
+                        String str1 = "Host: " + host + "\r\n";
+                        spw.write(str1);
+                        String str = "If-modified-since: " + modifTime
+                                + "\r\n";
+                        spw.write(str);
+                        spw.write("\r\n");
+                        spw.flush();
+                        System.out.print(str1);
+                        System.out.print(str);
+ 
+                        String info = sbr.readLine();
+                        System.out.println("æœåŠ¡å™¨å‘å›çš„ä¿¡æ¯æ˜¯ï¼š"+info);
+                        if (info.contains("Not Modified")) {
+                            int j = 0;
+                            System.out.println("ä½¿ç”¨ç¼“å­˜ä¸­çš„æ•°æ®");
+                            while (j < cacheInfo.size()) {
+                                info = cacheInfo.get(j++);
+                                info += "\r\n";
+                                System.out.print(info);
+                                cpw.write(info);
+                            }
+                            cpw.write("\r\n");
+                            cpw.flush();
+                        } else {
+                            System.out.println("æœ‰æ›´æ–°ï¼Œä½¿ç”¨æ–°çš„æ•°æ®");
+                            while (!info.equals("")) {
+                                info += "\r\n";
+                                System.out.print("æ–°çš„æ•°æ®æ˜¯ï¼š" + info);
+                                cpw.write(info);
+                                info = sbr.readLine();
+                            }
+                            cpw.write("\r\n");
+                            cpw.flush();
                         }
-                        cpw.write("\r\n");
-                        cpw.flush();
                     }
                 }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } 
     }
-
+ 
     public String getRequestURL(String buffer) {
         String[] tokens = buffer.split(" ");
         String URL = "";
@@ -231,14 +232,15 @@ public class MyHttpProxy extends Thread {
             }
         return URL;
     }
-
-    public void pipe(InputStream cis, InputStream sis, OutputStream sos, OutputStream cos) {
+ 
+    public void pipe(InputStream cis, InputStream sis, OutputStream sos,
+            OutputStream cos) {
         try {
             int length;
             byte bytes[] = new byte[BUFSIZ];
             while (true) {
                 try {
-                    if ((length = cis.read(bytes)) > 0) { // ¶ÁÈ¡¿Í»§¶ËµÄÇëÇó×ª¸ø·şÎñÆ÷
+                    if ((length = cis.read(bytes)) > 0) { // è¯»å–å®¢æˆ·ç«¯çš„è¯·æ±‚è½¬ç»™æœåŠ¡å™¨
                         sos.write(bytes, 0, length);
                         if (logging)
                             writeLog(bytes, 0, length, 1);
@@ -250,8 +252,8 @@ public class MyHttpProxy extends Thread {
                     e.printStackTrace();
                 }
                 try {
-                    if ((length = sis.read(bytes)) > 0) {// ½ÓÊÜ·şÎñÆ÷µÄÏìÓ¦»Ø´«¸øÇëÇóµÄ¿Í»§¶Ë
-                        cos.write(bytes, 0, length); // ÒòÎªÊÇ°´×Ö½Ú¶ÁÈ¡£¬ËùÒÔ½«»Ø³µºÍ»»ĞĞ·ûÒ²´«µİ¹ıÈ¥ÁË
+                    if ((length = sis.read(bytes)) > 0) {// æ¥å—æœåŠ¡å™¨çš„å“åº”å›ä¼ ç»™è¯·æ±‚çš„å®¢æˆ·ç«¯
+                        cos.write(bytes, 0, length); // å› ä¸ºæ˜¯æŒ‰å­—èŠ‚è¯»å–ï¼Œæ‰€ä»¥å°†å›è½¦å’Œæ¢è¡Œç¬¦ä¹Ÿä¼ é€’è¿‡å»äº†
                         if (logging) {
                             writeLog(bytes, 0, length, 1);
                             writeLog(bytes, 0, length, 3);
@@ -264,10 +266,10 @@ public class MyHttpProxy extends Thread {
                 }
             }
         } catch (Exception e0) {
-            System.out.println("PipeÒì³£: " + e0);
+            System.out.println("Pipeå¼‚å¸¸: " + e0);
         }
     }
-
+ 
     public static void startProxy(int port, Class clobj) {
         try {
             ServerSocket ssock = new ServerSocket(port);
@@ -276,10 +278,11 @@ public class MyHttpProxy extends Thread {
                 Object[] arg = new Object[1];
                 sarg[0] = Socket.class;
                 try {
-                    java.lang.reflect.Constructor cons = clobj.getDeclaredConstructor(sarg);
+                    java.lang.reflect.Constructor cons = clobj
+                            .getDeclaredConstructor(sarg);
                     arg[0] = ssock.accept();
-                    System.out.println("Æô¶¯Ïß³Ì£º" + count++);
-                    cons.newInstance(arg); // ´´½¨HttpProxy»òÆäÅÉÉúÀàµÄÊµÀı
+                    System.out.println("å¯åŠ¨çº¿ç¨‹ï¼š"+count++);
+                    cons.newInstance(arg); // åˆ›å»ºHttpProxyæˆ–å…¶æ´¾ç”Ÿç±»çš„å®ä¾‹
                 } catch (Exception e) {
                     Socket esock = (Socket) arg[0];
                     try {
@@ -293,79 +296,79 @@ public class MyHttpProxy extends Thread {
             e.printStackTrace();
         }
     }
-
-    // ²âÊÔÓÃµÄ¼òµ¥main·½·¨
+ 
+    // æµ‹è¯•ç”¨çš„ç®€å•mainæ–¹æ³•
     static public void main(String args[]) throws FileNotFoundException {
-        System.out.println("ÔÚ¶Ë¿Ú10240Æô¶¯´úÀí·şÎñÆ÷\n");
+        System.out.println("åœ¨ç«¯å£8888å¯åŠ¨ä»£ç†æœåŠ¡å™¨\n");
         OutputStream file_S = new FileOutputStream(new File("log_s.txt"));
         OutputStream file_C = new FileOutputStream(new File("log_c.txt"));
-        OutputStream file_D = new FileOutputStream("log_d.txt", true);
+        OutputStream file_D = new FileOutputStream("log_d.txt",true);
         MyHttpProxy.log_S = file_S;
         MyHttpProxy.log_C = file_C;
-        MyHttpProxy.log_D = file_D; // Ö±½Ó´æ´¢Ïà¹ØURl¶ÔÓ¦µÄÏìÓ¦±¨ÎÄ
+        MyHttpProxy.log_D = file_D; // ç›´æ¥å­˜å‚¨ç›¸å…³URlå¯¹åº”çš„å“åº”æŠ¥æ–‡
         MyHttpProxy.logging = true;
-        MyHttpProxy.startProxy(10240, MyHttpProxy.class);
+        MyHttpProxy.startProxy(8888, MyHttpProxy.class);
     }
-
+ 
     public String findCache(String head) {
         cacheInfo = new ArrayList<String>();
         String resul = null;
         int count = 0;
         try {
-            // Ö±½ÓÔÚ´æÓĞurlºÍÏàÓ¦ĞÅÏ¢µÄÎÄ¼şÖĞ²éÕÒ
+            // ç›´æ¥åœ¨å­˜æœ‰urlå’Œç›¸åº”ä¿¡æ¯çš„æ–‡ä»¶ä¸­æŸ¥æ‰¾
             InputStream file_D = new FileInputStream("log_d.txt");
             String info = "";
             while (true) {
                 int c = file_D.read();
                 if (c == -1)
-                    break; // -1Îª½áÎ²±êÖ¾
+                    break; // -1ä¸ºç»“å°¾æ ‡å¿—
                 if (c == '\r') {
                     file_D.read();
-                    break;// ¶ÁÈëÃ¿Ò»ĞĞÊı¾İ
+                    break;// è¯»å…¥æ¯ä¸€è¡Œæ•°æ®
                 }
                 if (c == '\n')
                     break;
                 info = info + (char) c;
             }
-            System.out.println("µÚÒ»´ÎµÃµ½£º" + info);
-            System.out.println("ÒªÕÒµÄÊÇ£º" + head);
+            System.out.println("ç¬¬ä¸€æ¬¡å¾—åˆ°ï¼š" + info);
+            System.out.println("è¦æ‰¾çš„æ˜¯ï¼š" + head);
             int m = 0;
-            while ((m = file_D.read()) != -1 && info != null) {
-                // System.out.println("ÔÚÑ°ÕÒ£º"+info);
-                // ÕÒµ½ÏàÍ¬µÄ£¬ÄÇÃ´ËüÏÂÃæµÄ¾ÍÊÇÏìÓ¦ĞÅÏ¢£¬ÕÒÉÏ´ÎĞŞ¸ÄµÄÊ±¼ä
+            while ((m = file_D.read()) != -1 && info!=null) {
+                //System.out.println("åœ¨å¯»æ‰¾ï¼š"+info);
+                // æ‰¾åˆ°ç›¸åŒçš„ï¼Œé‚£ä¹ˆå®ƒä¸‹é¢çš„å°±æ˜¯å“åº”ä¿¡æ¯ï¼Œæ‰¾ä¸Šæ¬¡ä¿®æ”¹çš„æ—¶é—´
                 if (info.contains(head)) {
                     String info1;
                     do {
-                        System.out.println("ÕÒµ½ÏàÍ¬µÄÁË£º" + info);
+                        System.out.println("æ‰¾åˆ°ç›¸åŒçš„äº†ï¼š" + info);
                         info1 = "";
-                        if (m != '\r' && m != '\n')
+                        if(m!='\r' && m != '\n')
                             info1 += (char) m;
-                        while (true) {
+                        while (true) { 
                             m = file_D.read();
                             if (m == -1)
                                 break;
                             if (m == '\r') {
-                                file_D.read();
+                                file_D.read(); 
                                 break;
                             }
-                            if (m == '\n') {
-                                break;
+                            if (m == '\n') { 
+                                break; 
                             }
                             info1 += (char) m;
                         }
-                        System.out.println("info1ÊÇ£º" + info1);
+                        System.out.println("info1æ˜¯ï¼š"+info1);
                         if (info1.contains("Last-Modified:")) {
-                            resul = info1.substring(16);
-                        }
+                            resul = info1.substring(16); 
+                        } 
                         cacheInfo.add(info1);
-                        if (info1.equals("")) {
-                            System.out.print("ÎÒÊÇ¿Õ");
+                        if(info1.equals("")){ 
+                            System.out.print("æˆ‘æ˜¯ç©º");
                             return resul;
-                        }
+                        } 
                     } while (!info1.equals("") && info1 != null && m != -1);
                 }
                 info = "";
-                while (true) {
+                while (true) { 
                     if (m == -1)
                         break;
                     if (m == '\r') {
@@ -378,13 +381,13 @@ public class MyHttpProxy extends Thread {
                     m = file_D.read();
                 }
             }
-        } catch (FileNotFoundException e) {
+        } catch (FileNotFoundException e) { 
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-
+ 
         return resul;
     }
-
+ 
 }
