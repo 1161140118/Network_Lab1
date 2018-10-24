@@ -26,12 +26,25 @@ public class HttpHeader {
         setHostandCookie(headline);
     }
 
-    private String getURL(String string) {
+    public static String getURL(String string) {
         String[] line = string.split(" ");
         return line[1];
     }
+    
+    public static String getHostFromURL(String URL) {
+        String host = "";
+        int n;
+        // ≥È»°host
+        n = URL.indexOf("//");
+        if (n != -1)
+            host = URL.substring(n + 2); // www.baidu.com/
+        n = host.indexOf('/');
+        if (n != -1)
+            host = host.substring(0, n);// www.baidu.com
+        return host;
+    }
 
-    private String getMethod(String string) {
+    public static String getMethod(String string) {
         if (string.contains("GET")) {
             return "GET";
         }

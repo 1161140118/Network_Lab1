@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -19,10 +20,18 @@ import javax.sound.sampled.Line;
  *
  */
 public class Processer extends Thread {
-    private BufferedReader clientInputReader;
-    private BufferedWriter clientOutputWriter;
-    private BufferedReader serverInputReader;
-    private PrintWriter serverOutputWriter;
+    private InputStream clientInput = null;
+    private InputStream serverInput = null;
+    private OutputStream clientOutput = null;
+    private OutputStream serverOutput = null;
+    private BufferedReader clientReader = null;
+    private BufferedReader serverReader = null;
+    private PrintWriter clientWriter = null;
+    private PrintWriter serverWriter = null;
+
+
+
+    private final Socket clientSocket;
     private int num;
 
     /**
@@ -31,13 +40,17 @@ public class Processer extends Thread {
      * 
      */
     public Processer(Socket clientSocket, int num) throws IOException {
-        clientInputReader =
-                new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        clientOutputWriter =
-                new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+        this.clientSocket = clientSocket;
+
+        // 初始化客户端输入输出
+        clientInput = clientSocket.getInputStream();
+        clientReader = new BufferedReader(new InputStreamReader(clientInput));
+        clientOutput = clientSocket.getOutputStream();
+        clientWriter = new PrintWriter(clientOutput);
+
         // TODO enable multithreading
-        // start();
-        run();
+//        start();
+         run();
 
         System.err.println(" 关闭套接字 : " + num);
         clientSocket.close();
@@ -52,27 +65,37 @@ public class Processer extends Thread {
     public void run() {
 
         // Get message from client.
-        List<String> httpline = getInput(clientInputReader);
-        if (httpline == null || httpline.size() == 0) {
-            System.err.println("Failed to get input from client.");
+        // List<String> httpline = getInput(clientReader);
+        // if (httpline == null || httpline.size() == 0) {
+        // System.err.println("Failed to get input from client.");
+        // return;
+        // }
+
+        String firstline = "";// the first line of request http header.
+
+        // Parse httphead.
+        try {
+            firstline = clientReader.readLine();
+            System.out.println("first line      >>> " + firstline);
+
+        } catch (IOException e) {
+            System.err.println("Failed to read first line.");
             return;
         }
 
-        // Parse httphead.
-        HttpHeader header = new HttpHeader(httpline);
+        // HttpHeader header = new HttpHeader(httpline);
 
-        if (header.getMethod() == null) {
+        if (HttpHeader.getMethod(firstline) == null) {
             System.err.println("Ignored method!");
             return;
         }
 
-        System.out.println(header.getMethod());
-        System.out.println(header.getTargetURL());
-        System.out.println(header.getTargetHost());
-        System.out.println(header.getCookie());
+        String host = HttpHeader.getHostFromURL(HttpHeader.getURL(firstline));
+        System.out.println("Get host : " + host);
 
         // Connect server.
-        Socket serverSocket = connectToServer(header.getTargetHost(), HttpProxyServer.httpPort, 3);
+//        Socket serverSocket = connectToServer(host, HttpProxyServer.httpPort, 3);
+        Socket serverSocket = connectToServer("192.168.199.131", 10241, 3);
         if (serverSocket == null) {
             return;
         }
@@ -80,29 +103,54 @@ public class Processer extends Thread {
 
 
         // Send message to server.
-        // try {
-        System.err.println("\nThe following strings will be send to server:\n");
-        for (String string : httpline) {
-            System.err.println(string);
-            serverOutputWriter.write(string + HttpHeader.delimiter);
-            serverOutputWriter.flush();
+        getAndSendToServer(clientReader, serverWriter, firstline);
+        System.err.println("----- Successful to send message to server -----");
+
+        // Send message back to client.
+        getAndSendToClient(serverInput, clientOutput);
+        System.err.println("----- Successful to send message to client -----");
+
+
+    }
+
+    // Turn the request from client to server.
+    private void getAndSendToServer(BufferedReader clientReader, PrintWriter serverWriter,
+            String buffer) {
+        while (!buffer.equals("")) {
+            buffer += "\r\n";
+            serverWriter.write(buffer);
+            System.out.print("Send to server      >>> " + buffer);
+            try {
+                buffer = clientReader.readLine();
+                System.out.println("Receive from client <<< " + buffer);
+            } catch (IOException e) {
+                System.err.println("Failed to read a line from client.");
+                return;
+            }
         }
-        // } catch (IOException e) {
-        // System.err.println("Failed to send message to server");
-        // return;
-        // }
-        System.out.println("Successful to send message to server");
+        serverWriter.write("\r\n");
+        serverWriter.flush();
+    }
 
-
-        // Get message from server
-        List<String> response = getInput(serverInputReader);
-        if (response == null) {
-            System.err.println("Failed to get input.");
+    // Get message from server and send to client.
+    private void getAndSendToClient(InputStream serverInput, OutputStream clientOutput) {
+        int length;
+        byte[] bytes = new byte[2048];
+        while (true) {
+            try {
+                if ((length = serverInput.read(bytes)) > 0) {
+                    clientOutput.write(bytes, 0, length);
+                    System.out.println("Receive from server <<< " + new String(bytes));
+                } else if (length < 0) {
+                    break;
+                }
+            } catch (IOException e) {
+                System.err.println("Failed to get message from server");
+            }
         }
-        System.err.println(response);
-
-
-
+        clientWriter.write("\r\n");
+        clientWriter.flush();
+        clientWriter.close();
     }
 
     private List<String> getInput(BufferedReader bufferedReader) {
@@ -130,12 +178,18 @@ public class Processer extends Thread {
         for (int i = 1; i <= times; i++) {
             try {
                 Socket serverSocket = new Socket(host, port);
-                serverInputReader =
-                        new BufferedReader(new InputStreamReader(serverSocket.getInputStream()));
-                // serverOutputWriter = serverSocket.getOutputStream();
-                serverOutputWriter = new PrintWriter(serverSocket.getOutputStream(), true);
+
+                serverInput = serverSocket.getInputStream();
+                serverReader = new BufferedReader(new InputStreamReader(serverInput));
+                serverOutput = serverSocket.getOutputStream();
+                serverWriter = new PrintWriter(serverOutput);
+
                 return serverSocket;
             } catch (IOException e) {
+                serverInput = null;
+                serverReader = null;
+                serverOutput = null;
+                serverWriter = null;
                 System.err.println("Failure to connect to target server, repeat for " + (times - i)
                         + " times at most.");
                 try {
@@ -146,6 +200,19 @@ public class Processer extends Thread {
             }
         }
         return null;
+    }
+
+    private String getRequestURL(String buffer) {
+        String[] tokens = buffer.split(" ");
+        String URL = "";
+        if (tokens[0].equals("GET"))
+            for (int index = 0; index < tokens.length; index++) {
+                if (tokens[index].startsWith("http://")) {
+                    URL = tokens[index];
+                    break;
+                }
+            }
+        return URL;
     }
 
 
