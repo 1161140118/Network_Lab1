@@ -146,11 +146,17 @@ public class Processer extends Thread {
                 }
             } catch (IOException e) {
                 System.err.println("Failed to get message from server");
+                break;
             }
         }
         clientWriter.write("\r\n");
         clientWriter.flush();
-        clientWriter.close();
+//        try {
+//            clientSocket.close();
+//        } catch (IOException e) {
+//            System.err.println("Failed to close client socket.");
+//        }
+        System.out.println("Transponding to client complete.");
     }
 
     private List<String> getInput(BufferedReader bufferedReader) {
