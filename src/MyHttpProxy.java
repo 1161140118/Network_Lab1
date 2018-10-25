@@ -147,10 +147,15 @@ public class MyHttpProxy extends Thread {
                         buffer += "\r\n";
                         System.out.println("Send to server >>> " + buffer);
                         if (buffer.contains("www.taobao.com")) { // 屏蔽人人网，如果是淘宝就发送淘宝的报文
-                            int k = 0;
-                            while (requestInfo.size() - k > 0) {
+//                            int k = 0;
+//                            while (requestInfo.size() - k > 0) {
+//                                spw.write(buffer);
+//                                buffer = requestInfo.get(k++);
+//                                buffer += "\r\n";
+//                            }
+                            for(int k=0; k <requestInfo.size() ; k++) {
                                 spw.write(buffer);
-                                buffer = requestInfo.get(k++);
+                                buffer = requestInfo.get(k);
                                 buffer += "\r\n";
                             }
                             break;
@@ -174,7 +179,8 @@ public class MyHttpProxy extends Thread {
                         try {
                             if ((length = sis.read(bytes)) > 0) { // 读取客户端的请求转给服务器
                                 cos.write(bytes, 0, length);
-                                System.out.println("Send to client >> " + new String(bytes,"ASCII"));
+                                // System.out.println("Send to client >> " + new
+                                // String(bytes,"ASCII"));
                                 if (logging) {
                                     writeLog(bytes, 0, length, 1);
                                     writeLog(bytes, 0, length, 3);
@@ -196,7 +202,7 @@ public class MyHttpProxy extends Thread {
                     cpw.flush();
                 } else {
                     buffer += "\r\n";
-                    spw.write(buffer);
+                    spw.write(buffer); // 首部行
                     System.out.print("向服务器发送确认修改时间请求:" + buffer);
                     String str1 = "Host: " + host + "\r\n";
                     spw.write(str1);
@@ -249,81 +255,6 @@ public class MyHttpProxy extends Thread {
                 }
             }
         return URL;
-    }
-
-    public void pipe(InputStream cis, InputStream sis, OutputStream sos, OutputStream cos) {
-        try {
-            int length;
-            byte bytes[] = new byte[BUFSIZ];
-            while (true) {
-                try {
-                    if ((length = cis.read(bytes)) > 0) { // 读取客户端的请求转给服务器
-                        sos.write(bytes, 0, length);
-                        if (logging)
-                            writeLog(bytes, 0, length, 1);
-                    } else if (length < 0)
-                        break;
-                } catch (SocketTimeoutException e) {
-                } catch (InterruptedIOException e) {
-                    System.out.println("\nRequest Exception:");
-                    e.printStackTrace();
-                }
-                try {
-                    if ((length = sis.read(bytes)) > 0) {// 接受服务器的响应回传给请求的客户端
-                        cos.write(bytes, 0, length); // 因为是按字节读取，所以将回车和换行符也传递过去了
-                        if (logging) {
-                            writeLog(bytes, 0, length, 1);
-                            writeLog(bytes, 0, length, 3);
-                        }
-                    }
-                } catch (SocketTimeoutException e) {
-                } catch (InterruptedIOException e) {
-                    System.out.println("\nResponse Exception:");
-                    e.printStackTrace();
-                }
-            }
-        } catch (Exception e0) {
-            System.out.println("Pipe异常: " + e0);
-        }
-    }
-
-    public static void startProxy(int port, Class clobj) {
-        try {
-            ServerSocket ssock = new ServerSocket(port);
-            while (true) {
-                Class[] sarg = new Class[1];
-                Object[] arg = new Object[1];
-                sarg[0] = Socket.class;
-                try {
-                    java.lang.reflect.Constructor cons = clobj.getDeclaredConstructor(sarg);
-                    arg[0] = ssock.accept();
-                    System.out.println("启动线程：" + count++);
-                    cons.newInstance(arg); // 创建HttpProxy或其派生类的实例
-                } catch (Exception e) {
-                    Socket esock = (Socket) arg[0];
-                    try {
-                        esock.close();
-                    } catch (Exception ec) {
-                    }
-                }
-            }
-        } catch (IOException e) {
-            System.out.println("\nStartProxy Exception:");
-            e.printStackTrace();
-        }
-    }
-
-    // 测试用的简单main方法
-    static public void main(String args[]) throws FileNotFoundException {
-        System.out.println("在端口10240启动代理服务器\n");
-        OutputStream file_S = new FileOutputStream(new File("log_s.txt"));
-        OutputStream file_C = new FileOutputStream(new File("log_c.txt"));
-        OutputStream file_D = new FileOutputStream("log_d.txt", true);
-        MyHttpProxy.log_S = file_S;
-        MyHttpProxy.log_C = file_C;
-        MyHttpProxy.log_D = file_D; // 直接存储相关URl对应的响应报文
-        MyHttpProxy.logging = true;
-        MyHttpProxy.startProxy(10240, MyHttpProxy.class);
     }
 
     public String findCache(String head) {
@@ -406,4 +337,84 @@ public class MyHttpProxy extends Thread {
         return resul;
     }
 
+
+
+    public static void startProxy(int port, Class clobj) {
+        try {
+            ServerSocket ssock = new ServerSocket(port);
+            while (true) {
+                Class[] sarg = new Class[1];
+                Object[] arg = new Object[1];
+                sarg[0] = Socket.class;
+                try {
+                    java.lang.reflect.Constructor cons = clobj.getDeclaredConstructor(sarg);
+                    arg[0] = ssock.accept();
+                    System.out.println("启动线程：" + count++);
+                    cons.newInstance(arg); // 创建HttpProxy或其派生类的实例
+                } catch (Exception e) {
+                    Socket esock = (Socket) arg[0];
+                    try {
+                        esock.close();
+                    } catch (Exception ec) {
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("\nStartProxy Exception:");
+            e.printStackTrace();
+        }
+    }
+
+    // 测试用的简单main方法
+    static public void main(String args[]) throws FileNotFoundException {
+        System.out.println("在端口10240启动代理服务器\n");
+        OutputStream file_S = new FileOutputStream(new File("log_s.txt"));
+        OutputStream file_C = new FileOutputStream(new File("log_c.txt"));
+        OutputStream file_D = new FileOutputStream("log_d.txt", true);
+        MyHttpProxy.log_S = file_S;
+        MyHttpProxy.log_C = file_C;
+        MyHttpProxy.log_D = file_D; // 直接存储相关URl对应的响应报文
+        MyHttpProxy.logging = true;
+        MyHttpProxy.startProxy(10240, MyHttpProxy.class);
+    }
+
+
+
+    public void pipe(InputStream cis, InputStream sis, OutputStream sos, OutputStream cos) {
+        try {
+            int length;
+            byte bytes[] = new byte[BUFSIZ];
+            while (true) {
+                try {
+                    if ((length = cis.read(bytes)) > 0) { // 读取客户端的请求转给服务器
+                        sos.write(bytes, 0, length);
+                        if (logging)
+                            writeLog(bytes, 0, length, 1);
+                    } else if (length < 0)
+                        break;
+                } catch (SocketTimeoutException e) {
+                } catch (InterruptedIOException e) {
+                    System.out.println("\nRequest Exception:");
+                    e.printStackTrace();
+                }
+                try {
+                    if ((length = sis.read(bytes)) > 0) {// 接受服务器的响应回传给请求的客户端
+                        cos.write(bytes, 0, length); // 因为是按字节读取，所以将回车和换行符也传递过去了
+                        if (logging) {
+                            writeLog(bytes, 0, length, 1);
+                            writeLog(bytes, 0, length, 3);
+                        }
+                    }
+                } catch (SocketTimeoutException e) {
+                } catch (InterruptedIOException e) {
+                    System.out.println("\nResponse Exception:");
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e0) {
+            System.out.println("Pipe异常: " + e0);
+        }
+    }
+
+    
 }
