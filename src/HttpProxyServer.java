@@ -1,4 +1,8 @@
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -10,12 +14,12 @@ import java.net.SocketAddress;
  */
 public class HttpProxyServer {
     public static ServerSocket proxyServer;
-    public static SocketAddress proxyServerAddr;
     public static final int httpPort = 80;
-    public static final int proxyPort = 10240;
-    public static final int proxyTimeOut = 5000;  // wait for no more than 1 minute.
-    public static final int requestTimeOut = 500 ;
-    public static String cachePath;
+    public static int proxyPort = 10240;
+    public static final int proxyTimeOut = 60000; // wait for no more than 1 minute.
+    // public static final int requestTimeOut = 500 ;
+    public static String cachePath = "cache.txt";
+    public static OutputStream file;
 
 
     public static Boolean initSocket(int timeout) {
@@ -23,7 +27,7 @@ public class HttpProxyServer {
         try {
             proxyServer = new ServerSocket(proxyPort);
             proxyServer.setSoTimeout(timeout); // set timeout in millisecond
-            
+
         } catch (IOException e) {
             System.err.println("Failure to initialize proxy server socket.");
             return false;
@@ -34,7 +38,7 @@ public class HttpProxyServer {
     }
 
     public static Boolean initCache() {
-        // TODO 
+        // TODO
         return true;
     }
 
@@ -45,9 +49,24 @@ public class HttpProxyServer {
         
         System.out.println("代理服务器正在启动...");
         System.out.println("初始化...");
+        
+        // parse the cmd parameters.
+        if (args.length >= 1) {
+            proxyPort = Integer.valueOf(args[0]); // Get proxy port from cmd.
+        }
+        if (args.length >= 2) {
+            cachePath = args[1];    // Get cache file path.
+        }
 
         // 创建主套接字并监听
         if (!initSocket(proxyTimeOut)) {
+            return;
+        }
+        
+        try {
+            file = new FileOutputStream(new File(cachePath));
+        } catch (FileNotFoundException e1) {
+            System.err.println("Failed to access cache file!");
             return;
         }
 
@@ -55,26 +74,24 @@ public class HttpProxyServer {
 
         Socket acceptSocket = null;
         int i = 0;
-        
+
 
         // 代理服务器持续监听，等待客户端连接请求
         while (!proxyServer.isClosed()) {
             i++;
-            
+
             // 处理连接请求
             try {
                 acceptSocket = proxyServer.accept();
-                System.out.println("\n正在处理第 "+i+" 个连接请求...");
-                new Processer(acceptSocket,i);
-                
+                System.out.println("\n正在处理第 " + i + " 个连接请求...");
+                new Processer(acceptSocket, i);
+                Thread.sleep(200);
             } catch (IOException e) {
-                System.err.println("A connect was refused: "+i);
+                System.err.println("A connect was refused: " + i);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-
-            
         }
-
-
 
         // 关闭服务器套接字
         try {

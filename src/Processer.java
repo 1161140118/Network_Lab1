@@ -1,5 +1,7 @@
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -10,6 +12,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.Buffer;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import javax.sound.sampled.Line;
 
@@ -28,11 +31,17 @@ public class Processer extends Thread {
     private BufferedReader serverReader = null;
     private PrintWriter clientWriter = null;
     private PrintWriter serverWriter = null;
+    private HttpHeader httpHeader;
+    private Socket clientSocket;
+    private List<String> cachelines;
 
-
-
-    private final Socket clientSocket;
+    private static OutputStream file;
     private int num;
+
+    static {
+        file = HttpProxyServer.file;
+        System.err.println("----- Successful to init cache file. -----");
+    }
 
     /**
      * 
@@ -49,11 +58,8 @@ public class Processer extends Thread {
         clientWriter = new PrintWriter(clientOutput);
 
         // TODO enable multithreading
-//        start();
-         run();
-
-        System.err.println(" 关闭套接字 : " + num);
-        clientSocket.close();
+        start();
+        // run();
     }
 
     /*
@@ -64,120 +70,100 @@ public class Processer extends Thread {
     @Override
     public void run() {
 
-        // Get message from client.
-        // List<String> httpline = getInput(clientReader);
-        // if (httpline == null || httpline.size() == 0) {
-        // System.err.println("Failed to get input from client.");
-        // return;
-        // }
+        List<String> httplines = getFromClient();
+        HttpHeader header = new HttpHeader(httplines); // 解析请求行
 
-        String firstline = "";// the first line of request http header.
-
-        // Parse httphead.
-        try {
-            firstline = clientReader.readLine();
-            System.out.println("first line      >>> " + firstline);
-
-        } catch (IOException e) {
-            System.err.println("Failed to read first line.");
-            return;
-        }
-
-        // HttpHeader header = new HttpHeader(httpline);
-
-        if (HttpHeader.getMethod(firstline) == null) {
+        if (header.getMethod() == null) {
             System.err.println("Ignored method!");
             return;
         }
 
-        String host = HttpHeader.getHostFromURL(HttpHeader.getURL(firstline));
+        String host = header.getTargetHost();
         System.out.println("Get host : " + host);
 
+        // Search the cache.
+        String lastModifyTime = searchCache(header.getTargetURL());
+
         // Connect server.
-//        Socket serverSocket = connectToServer(host, HttpProxyServer.httpPort, 3);
-        Socket serverSocket = connectToServer("192.168.199.131", 10241, 3);
+        Socket serverSocket = connectToServer(host, HttpProxyServer.httpPort, 3);
         if (serverSocket == null) {
             return;
         }
-        System.out.println("Successful to connect to target server.");
+        System.err.println("----- Successful to connect to target server. ------");
 
 
         // Send message to server.
-        getAndSendToServer(clientReader, serverWriter, firstline);
-        System.err.println("----- Successful to send message to server -----");
+        SendToServer(httplines);
+        System.err.println("----- Successful to send message to server. -----");
 
         // Send message back to client.
-        getAndSendToClient(serverInput, clientOutput);
-        System.err.println("----- Successful to send message to client -----");
+        getAndSendToClient();
+        System.err.println("----- Successful to send message to client. -----");
 
-
+        try {
+            clientSocket.close();
+        } catch (IOException e) {
+            System.err.println("Failed to close client socket!");
+        }
     }
 
-    // Turn the request from client to server.
-    private void getAndSendToServer(BufferedReader clientReader, PrintWriter serverWriter,
-            String buffer) {
-        while (!buffer.equals("")) {
-            buffer += "\r\n";
-            serverWriter.write(buffer);
-            System.out.print("Send to server      >>> " + buffer);
-            try {
+    private List<String> getFromClient() {
+        List<String> httplines = new LinkedList<>();
+        try {
+            String buffer = clientReader.readLine();
+            System.out.println("Receive from client <<< " + buffer);
+            httplines.add(buffer);
+            while (!buffer.equals("")) {
                 buffer = clientReader.readLine();
                 System.out.println("Receive from client <<< " + buffer);
-            } catch (IOException e) {
-                System.err.println("Failed to read a line from client.");
-                return;
+                httplines.add(buffer);
             }
+        } catch (IOException e) {
+            System.err.println("Failed to read a line from client!");
+            return null;
         }
+        return httplines;
+    }
+
+
+    // Turn the request from client to server and save the http header lines.
+    private void SendToServer(List<String> httplines) {
+
+        for (String buffer : httplines) {
+            buffer += "\r\n";
+            writeCache(buffer.getBytes(), buffer.length());
+            // writeCache("\r\n".getBytes(), 2);
+            System.out.print("Send to server      >>> " + buffer);
+            serverWriter.write(buffer);
+            serverWriter.flush();
+        }
+
         serverWriter.write("\r\n");
         serverWriter.flush();
     }
 
     // Get message from server and send to client.
-    private void getAndSendToClient(InputStream serverInput, OutputStream clientOutput) {
+    private void getAndSendToClient() {
         int length;
         byte[] bytes = new byte[2048];
         while (true) {
             try {
                 if ((length = serverInput.read(bytes)) > 0) {
                     clientOutput.write(bytes, 0, length);
-                    System.out.println("Receive from server <<< " + new String(bytes));
+                    writeCache(bytes, length);
+                    // System.out.println("Receive from server <<< " + new String(bytes,"UTF-8"));
                 } else if (length < 0) {
                     break;
                 }
             } catch (IOException e) {
-                System.err.println("Failed to get message from server");
+                System.err.println("Failed to get message from server!");
                 break;
             }
         }
         clientWriter.write("\r\n");
         clientWriter.flush();
-//        try {
-//            clientSocket.close();
-//        } catch (IOException e) {
-//            System.err.println("Failed to close client socket.");
-//        }
-        System.out.println("Transponding to client complete.");
-    }
-
-    private List<String> getInput(BufferedReader bufferedReader) {
-        List<String> httpline = new ArrayList<>();
-        String line = "";
-
-        System.out.println(">>> Start read input.");
-
-        // Get request message from client.
-        try {
-            // while ((line = bufferedReader.readLine()) != null && line.length() != 0) {
-            while (bufferedReader.ready()) {
-                line = bufferedReader.readLine();
-                httpline.add(line);
-                System.out.println(">>> " + line);
-            }
-        } catch (IOException e) {
-            System.err.println("Get IOException.");
-            return null;
-        }
-        return httpline;
+        writeCache("\r\n".getBytes(), 2);
+        System.err.println("----- Transponding to client complete. ----- " + num);
     }
 
     private Socket connectToServer(String host, int port, int times) {
@@ -206,6 +192,97 @@ public class Processer extends Thread {
             }
         }
         return null;
+    }
+
+    private String searchCache(String url) {
+        cachelines = new ArrayList<String>();
+        String resul = null;
+        int count = 0;
+        try {
+            // 直接在存有url和相应信息的文件中查找
+            InputStream cache = new FileInputStream("cache.txt");
+            String info = "";
+            while (true) {
+                int c = cache.read();
+                if (c == -1)
+                    break; // -1为结尾标志
+                if (c == '\r') {
+                    cache.read();
+                    break;// 读入每一行数据
+                }
+                if (c == '\n')
+                    break;
+                info = info + (char) c;
+            }
+            System.out.println("第一次得到：" + info);
+            System.out.println("要找的是：" + url);
+            int m = 0;
+            while ((m = cache.read()) != -1 && info != null) {
+                // System.out.println("在寻找："+info);
+                // 找到相同的，那么它下面的就是响应信息，找上次修改的时间
+                if (info.contains(url)) {
+                    String info1;
+                    do {
+                        System.out.println("找到相同的了：" + info);
+                        info1 = "";
+                        if (m != '\r' && m != '\n')
+                            info1 += (char) m;
+                        while (true) {
+                            m = cache.read();
+                            if (m == -1)
+                                break;
+                            if (m == '\r') {
+                                cache.read();
+                                break;
+                            }
+                            if (m == '\n') {
+                                break;
+                            }
+                            info1 += (char) m;
+                        }
+                        System.out.println("info1是：" + info1);
+                        if (info1.contains("Last-Modified:")) {
+                            resul = info1.substring(16);
+                        }
+                        cachelines.add(info1);
+                        if (info1.equals("")) {
+                            System.out.print("我是空");
+                            return resul;
+                        }
+                    } while (!info1.equals("") && info1 != null && m != -1);
+                }
+                info = "";
+                while (true) {
+                    if (m == -1)
+                        break;
+                    if (m == '\r') {
+                        cache.read();
+                        break;
+                    }
+                    if (m == '\n')
+                        break;
+                    info += (char) m;
+                    m = cache.read();
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return resul;
+    }
+
+
+    private void writeCache(byte[] cache, int length) {
+        try {
+            for (int i = 0; i < length; i++) {
+                file.write((char) ((int) cache[i]));// change the coded format.
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to write cache :" + new String(cache));
+        }
     }
 
     private String getRequestURL(String buffer) {
