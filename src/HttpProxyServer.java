@@ -82,7 +82,6 @@ public class HttpProxyServer {
             // 处理连接请求
             try {
                 acceptSocket = proxyServer.accept();
-                System.out.println("\n正在处理第 " + i + " 个连接请求...");
                 new Processer(acceptSocket, i);
                 Thread.sleep(200);
             } catch (IOException e) {
