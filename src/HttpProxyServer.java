@@ -58,13 +58,13 @@ public class HttpProxyServer {
             cachePath = args[1];    // Get cache file path.
         }
 
-        // 创建主套接字并监听
+        // Create the main socket and set listening.
         if (!initSocket(proxyTimeOut)) {
             return;
         }
         
         try {
-            file = new FileOutputStream(new File(cachePath));
+            file = new FileOutputStream(new File(cachePath),true);
         } catch (FileNotFoundException e1) {
             System.err.println("Failed to access cache file!");
             return;
@@ -74,7 +74,6 @@ public class HttpProxyServer {
 
         Socket acceptSocket = null;
         int i = 0;
-
 
         // 代理服务器持续监听，等待客户端连接请求
         while (!proxyServer.isClosed()) {

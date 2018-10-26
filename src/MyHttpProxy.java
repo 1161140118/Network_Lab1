@@ -145,7 +145,6 @@ public class MyHttpProxy extends Thread {
                 if (modifTime == null) {
                     while (!buffer.equals("")) {
                         buffer += "\r\n";
-                        System.out.println("Send to server >>> " + buffer);
                         if (buffer.contains("www.taobao.com")) { // 屏蔽人人网，如果是淘宝就发送淘宝的报文
 //                            int k = 0;
 //                            while (requestInfo.size() - k > 0) {
@@ -281,15 +280,18 @@ public class MyHttpProxy extends Thread {
             System.out.println("要找的是：" + head);
             int m = 0;
             while ((m = file_D.read()) != -1 && info != null) {
+            	
                 // System.out.println("在寻找："+info);
                 // 找到相同的，那么它下面的就是响应信息，找上次修改的时间
                 if (info.contains(head)) {
                     String info1;
+                    // collect response message.
                     do {
                         System.out.println("找到相同的了：" + info);
                         info1 = "";
                         if (m != '\r' && m != '\n')
                             info1 += (char) m;
+                        // get a line
                         while (true) {
                             m = file_D.read();
                             if (m == -1)
@@ -303,6 +305,7 @@ public class MyHttpProxy extends Thread {
                             }
                             info1 += (char) m;
                         }
+                        
                         System.out.println("info1是：" + info1);
                         if (info1.contains("Last-Modified:")) {
                             resul = info1.substring(16);
@@ -313,7 +316,9 @@ public class MyHttpProxy extends Thread {
                             return resul;
                         }
                     } while (!info1.equals("") && info1 != null && m != -1);
+               
                 }
+                
                 info = "";
                 while (true) {
                     if (m == -1)

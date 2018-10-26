@@ -72,6 +72,10 @@ public class HttpHeader {
             }
         }
     }
+    
+    public String getFirstline() {
+    	return headline.get(0);
+    }
 
     public String getMethod() {
         return method;
