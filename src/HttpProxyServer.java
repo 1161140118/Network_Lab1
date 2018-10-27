@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketAddress;
 
 
 /**
@@ -83,7 +82,7 @@ public class HttpProxyServer {
             try {
                 acceptSocket = proxyServer.accept();
                 new Processer(acceptSocket, i);
-                Thread.sleep(200);
+                Thread.sleep(100);
             } catch (IOException e) {
                 System.err.println("A connect was refused: " + i);
             } catch (InterruptedException e) {

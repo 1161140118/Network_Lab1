@@ -1,6 +1,5 @@
 import java.io.BufferedReader;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -8,6 +7,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,20 +37,28 @@ public class Processer extends Thread {
     private static OutputStream file;
     private static HashSet<String> forbidURL = new HashSet<>();
     private static HashSet<String> forbidUsers = new HashSet<>();
+    private static HashMap<String, String> redirectedURL = new HashMap<>();
 
     static {
         file = HttpProxyServer.file;
         System.out.println("Successful to init cache file.");
         forbidURL.add("yinle.cc");
         // forbidURL.add("jwts.hit.edu.cn");
-        // forbidUsers.add("127.0.0.1");
+//         forbidUsers.add("127.0.0.1");
+        redirectedURL.put("jwc.hit.edu.cn", "http://today.hit.edu.cn");
 
         // print forbidden message.
         System.out.println("Forbidden URL key word:");
+        if (forbidURL.size()==0) {
+            System.out.println("No url will be filtered");
+        }
         for (String string : forbidURL) {
             System.out.println("[ " + string + " ]");
         }
         System.out.println("Forbidden user ip:");
+        if (forbidUsers.size()==0) {
+            System.out.println("No user will be filtered.");
+        }
         for (String string : forbidUsers) {
             System.out.println("[ " + string + " ]");
         }
@@ -72,8 +80,8 @@ public class Processer extends Thread {
         clientOutput = clientSocket.getOutputStream();
         clientWriter = new PrintWriter(clientOutput);
 
-        // start();
-        run();
+        start();
+        // run();
     }
 
     /*
@@ -129,6 +137,12 @@ public class Processer extends Thread {
             return;
         }
 
+        /*
+         * Redirected.
+         */
+        if (reDirected(httpHeader.getTargetURL())) {
+            return;
+        }
 
 
         /*
@@ -153,7 +167,7 @@ public class Processer extends Thread {
         }
         if (lastModifyTime != null) {
             // Find the cache.
-            System.out.println("----- Get last modify time: " + lastModifyTime);
+            System.out.println("Get last modify time    : " + lastModifyTime);
             if (!modified(lastModifyTime)) {
                 // Not modified, send cache to client.
                 try {
@@ -178,15 +192,18 @@ public class Processer extends Thread {
         /*
          * No cache. Send message to server.
          */
-        writeCache(httpHeader.getFirstline().getBytes(), httpHeader.getFirstline().length());
-        writeCache("\r\n".getBytes(), 2);
         SendToServer(httplines);
         System.err.println("----- Successful to send message to server. -----");
 
         /*
          * Send message back to client.
          */
-        getAndSendToClient();
+        synchronized (this) {
+            writeCache("\n".getBytes(), 1);
+            writeCache(httpHeader.getFirstline().getBytes(), httpHeader.getFirstline().length());
+            writeCache("\r\n".getBytes(), 2);
+            getAndSendToClient();
+        }
         System.err.println("----- Successful to send message to client. -----");
 
         try {
@@ -212,6 +229,36 @@ public class Processer extends Thread {
             return null;
         }
         return httplines;
+    }
+
+    private boolean reDirected(String url) {
+        for (String string : redirectedURL.keySet()) {
+            if (url.contains(string)) {
+                try {
+                    System.err.println("The \"" + url + "\" will be redirected to \""
+                            + redirectedURL.get(string) + "\".");
+                    clientOutput.write("HTTP/1.1 302 Moved Temporarily\r\n".getBytes());
+                    clientOutput.flush();
+                    clientOutput
+                            .write(("Location: " + redirectedURL.get(string) + "\r\n").getBytes());
+                    clientOutput.flush();
+                    clientOutput.write("\r\n".getBytes());
+                    clientSocket.close();
+                    System.err.println(
+                            "----- The request \"" + url + "\" has been redirected. -----");
+                    return true;
+                } catch (IOException e) {
+                    System.out.println("Failed to send redirected message to client.");
+                    try {
+                        clientSocket.close();
+                    } catch (IOException e1) {
+                        e1.printStackTrace();
+                    }
+                }
+
+            }
+        }
+        return false;
     }
 
     /**
@@ -316,6 +363,7 @@ public class Processer extends Thread {
                 break;
             }
         }
+        // System.out.println("Receive from server <<< response message...");
         clientWriter.write("\r\n");
         clientWriter.flush();
         writeCache("\r\n".getBytes(), 2);
@@ -435,18 +483,4 @@ public class Processer extends Thread {
             System.err.println("Failed to write cache :" + new String(cache));
         }
     }
-
-    // private String getRequestURL(String buffer) {
-    // String[] tokens = buffer.split(" ");
-    // String URL = "";
-    // if (tokens[0].equals("GET"))
-    // for (int index = 0; index < tokens.length; index++) {
-    // if (tokens[index].startsWith("http://")) {
-    // URL = tokens[index];
-    // break;
-    // }
-    // }
-    // return URL;
-    // }
-
 }
