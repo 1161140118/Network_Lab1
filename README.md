@@ -1,7 +1,7 @@
 # Computer Networking Lab1
 
 ### basic function : proxy server
-### appendix function :
+### expand function :
 1. 		server cache local.
 2.		URL filter.
 3. 		User filter.
